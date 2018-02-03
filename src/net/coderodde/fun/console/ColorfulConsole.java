@@ -105,6 +105,11 @@ public final class ColorfulConsole extends JPanel {
     private int characterTileHeight = DEFAULT_CHARACTER_HEIGHT;
     
     /**
+     * Used for drawing text.
+     */
+    private final char[] characterArray = new char[1];
+    
+    /**
      * This inner static class implements a single character tile.
      */
     private static final class CharacterTile {
@@ -167,6 +172,11 @@ public final class ColorfulConsole extends JPanel {
                              height * characterTileHeight);
     }
     
+    @Override
+    public Dimension getPreferredSize() {
+        return getSize();
+    }
+    
     public void setBoldText(boolean bold) {
         this.boldFontOn = bold;
     }
@@ -211,10 +221,6 @@ public final class ColorfulConsole extends JPanel {
             updateConsoleSize(g);
         }
         
-        g.setColor(DEFAULT_BACKGROUND_COLOR);
-        g.fillRect(0, 0, width * characterTileWidth, height * characterTileHeight);
-        char[] characterArray = new char[1];
-        
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 CharacterTile characterTile = characterTiles[y][x];
@@ -241,6 +247,22 @@ public final class ColorfulConsole extends JPanel {
                             x * characterTileWidth, 
                             (y + 1) * characterTileHeight - 1);
             }
+        }
+    }
+    
+    @Override
+    public void setForeground(Color foregroundColor) {
+        if (foregroundColor != null) {
+            super.setForeground(foregroundColor);
+            repaint();
+        }
+    }
+    
+    @Override
+    public void setBackground(Color backgroundColor) {
+        if (backgroundColor != null) {
+            super.setBackground(backgroundColor);
+            repaint();
         }
     }
     
