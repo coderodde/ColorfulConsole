@@ -2,14 +2,12 @@ package net.coderodde.fun.console;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import javax.swing.JButton;
 import javax.swing.JColorChooser;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
@@ -96,6 +94,10 @@ public final class ColorfulConsoleApp extends JFrame {
                 }
             }
         });
+        
+        mainPanel.setFocusable(true);
+        mainPanel.addKeyListener(new ColorfulConsoleKeyListener(console));
+        mainPanel.requestFocus();
         
         getContentPane().add(mainPanel);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
