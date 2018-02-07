@@ -6,6 +6,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JPanel;
 
@@ -147,6 +148,12 @@ public final class ColorfulConsole extends JPanel {
     private final CursorBlinkThread cursorBlinkThread;
     
     /**
+     * The queue of the coordinates at which to update the tiles.
+     */
+    private final ConcurrentLinkedQueue<Point> repaintRequestQueue = 
+            new ConcurrentLinkedQueue<>();
+    
+    /**
      * This inner static class implements a single character tile.
      */
     private static final class CharacterTile {
@@ -189,11 +196,13 @@ public final class ColorfulConsole extends JPanel {
                 int y = cursorY.get();
                 CharacterTile tile = characterTiles[y][x];
                 tile.isBlinking = true;
+                repaintRequestQueue.add(new Point(x, y));
                 repaint();
                 sleep(blinkDuration);
                 
                 // Now restore the actual colors:
                 tile.isBlinking = false;
+                repaintRequestQueue.add(new Point(x, y));
                 repaint();
                 sleep(blinkDuration);
             } 
@@ -255,6 +264,15 @@ public final class ColorfulConsole extends JPanel {
         characterTiles[y][x].foregroundColor = getForeground();
         characterTiles[y][x].backgroundColor = getBackground();
         characterTiles[y][x].boldFont = boldFontOn;
+        repaintRequestQueue.add(new Point(x, y));
+        repaint();
+        
+        if (x < getConsoleWidth() - 1) {
+            cursorX.set(x + 1);
+        } else if (y < getConsoleHeight() - 1) {
+            cursorX.set(0);
+            cursorY.set(y + 1);
+        }
     }
     
     /**
@@ -323,9 +341,10 @@ public final class ColorfulConsole extends JPanel {
     public void setConsoleCursorPosition(int x, int y) {
         checkX(x);
         checkY(y);
+        repaintRequestQueue.add(new Point(cursorX.get(), cursorY.get()));
+        repaint();
         cursorX.set(x);
         cursorY.set(y);
-        repaint();
     }
     
     @Override
@@ -342,32 +361,39 @@ public final class ColorfulConsole extends JPanel {
                         characterTileWidth * width,
                         characterTileHeight * height);
         } else {
-            int x = cursorX.get();
-            int y = cursorY.get();
-            CharacterTile tile = characterTiles[y][x];
-            Font tileFont = new Font(Font.MONOSPACED,
-                                     tile.boldFont ? Font.BOLD : Font.PLAIN,
-                                     font.getSize());
-            
-            // Draw the background:
-            g.setColor(tile.isBlinking ? 
-                       tile.foregroundColor :
-                       tile.backgroundColor);
-            g.fillRect(x * characterTileWidth,
-                       y * characterTileHeight,
-                       characterTileWidth,
-                       characterTileHeight);
-            // Draw the foreground:
-            g.setColor(tile.isBlinking ? 
-                       tile.backgroundColor :
-                       tile.foregroundColor);
-            characterArray[0] = tile.character;
-            g.setFont(tileFont);
-            g.drawChars(characterArray, 
-                        0, 
-                        1, 
-                        x * characterTileWidth,
-                        y * characterTileHeight + 10);
+            while (!repaintRequestQueue.isEmpty()) {
+                Point point = repaintRequestQueue.poll();
+                
+                if (point != null) {
+                    int x = point.x;
+                    int y = point.y;
+                    CharacterTile tile = characterTiles[y][x];
+                    Font tileFont = new Font(Font.MONOSPACED,
+                                             Font.BOLD,//tile.boldFont ? Font.BOLD : Font.PLAIN,
+                                             font.getSize());
+
+                    // Draw the background:
+                    g.setColor(tile.isBlinking ? 
+                               tile.foregroundColor :
+                               tile.backgroundColor);
+                    g.fillRect(x * characterTileWidth,
+                               y * characterTileHeight,
+                               characterTileWidth,
+                               characterTileHeight);
+                    // Draw the foreground:
+                    g.setColor(tile.isBlinking ? 
+                               tile.backgroundColor :
+                               tile.foregroundColor);
+                    characterArray[0] = tile.character;
+                    g.setFont(tileFont);
+                    g.drawChars(characterArray, 
+                                0, 
+                                1, 
+                                x * characterTileWidth,
+                                y * characterTileHeight + 11);
+                    
+                }
+            }
         }
     }
     

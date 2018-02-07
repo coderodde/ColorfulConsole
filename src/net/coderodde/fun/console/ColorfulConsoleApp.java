@@ -41,7 +41,6 @@ public final class ColorfulConsoleApp extends JFrame {
     
     public ColorfulConsoleApp() {
         super(APP_TITLE);
-        
         controlsPanel.setLayout(new GridLayout(1, 4));
         controlsPanel.add(boldOnOffButton);
         controlsPanel.add(foregroundButton);

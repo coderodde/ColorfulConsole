@@ -25,7 +25,6 @@ public final class ColorfulConsoleKeyListener implements KeyListener {
 
     @Override
     public void keyPressed(KeyEvent e) {
-        System.out.println(e);
         switch (e.getKeyCode()) {
             case KeyEvent.VK_UP:
                 Point cursor = console.getConsoleCursorPosition();
