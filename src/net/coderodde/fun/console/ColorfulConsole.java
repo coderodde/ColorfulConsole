@@ -6,7 +6,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JPanel;
 
 /**
@@ -63,6 +63,16 @@ public final class ColorfulConsole extends JPanel {
     private static final int DEFAULT_BLINK_DURATION = 500;
     
     /**
+     * The initial value of the <code>x</code>-coordinate of the tile cursor.
+     */
+    private static final int INITIAL_CURSOR_X = 0;
+    
+    /**
+     * The initial value of the <code>y</code>-coordinate of the tile cursor.
+     */
+    private static final int INITIAL_CURSOR_Y = 0;
+    
+    /**
      * The width of the colorful console in characters.
      */
     private final int width;
@@ -83,10 +93,14 @@ public final class ColorfulConsole extends JPanel {
     private boolean boldFontOn;
     
     /**
-     * The current cursor position. Initial position is (0, 0) which is the 
-     * highest leftmost character tile.
+     * The <code>x</code>-coordinate of the cursor in character tiles.
      */
-    private final Point cursor = new Point();
+    private final AtomicInteger cursorX = new AtomicInteger(INITIAL_CURSOR_X);
+    
+    /**
+     * The <code>y</code>-coordinate of the cursor in character tiles.
+     */
+    private final AtomicInteger cursorY = new AtomicInteger(INITIAL_CURSOR_Y);
     
     /**
      * Set to {@code true} whenever there is a need to recalculate the panel
@@ -94,6 +108,12 @@ public final class ColorfulConsole extends JPanel {
      * request sets correctly the character width and height in pixels.
      */
     private boolean recalculatePanelDimension = true;
+    
+    /**
+     * A flag for rendering the entire console upon creation. Is then set to 
+     * {@code false} and the console redraws only updated character tiles.
+     */
+    private boolean initializeGraphics = true;
     
     /**
      * The character tile matrix.
@@ -110,6 +130,7 @@ public final class ColorfulConsole extends JPanel {
      */
     private int characterTileHeight = DEFAULT_CHARACTER_HEIGHT;
     
+    
     /**
      * Used for drawing text.
      */
@@ -124,201 +145,6 @@ public final class ColorfulConsole extends JPanel {
      * The blinked thread.
      */
     private final CursorBlinkThread cursorBlinkThread;
-    
-    /**
-     * The concurrent queue of rendering events.
-     */
-    private final 
-            ConcurrentLinkedQueue<TileRenderingEvent> renderingEventQueue =
-            new ConcurrentLinkedQueue<>();
-            
-    /**
-     * This class specifies the tile rendering event.
-     */
-    private static final class TileRenderingEvent {
-        
-        /**
-         * The character to render.
-         */
-        private final char character;
-        
-        /**
-         * The foreground color of the tile.
-         */
-        private final Color foregroundColor;
-        
-        /**
-         * The background color of the tile.
-         */
-        private final Color backgroundColor;
-        
-        /**
-         * The <code>x</code>-coordinate of the tile.
-         */
-        private final int x;
-        
-        /**
-         * The <code>y</code>-coordinate of the tile.
-         */
-        private final int y;
-        
-        /**
-         * If set to {@code true}, the bold font will be used. Otherwise, the 
-         * character will be printed as a plain character.
-         */
-        private final boolean boldFont;
-        
-        private TileRenderingEvent(char character,
-                                   Color foregroundColor,
-                                   Color backgroundColor,
-                                   int x,
-                                   int y,
-                                   boolean boldFont) {
-            this.character = character;
-            this.foregroundColor = foregroundColor;
-            this.backgroundColor = backgroundColor;
-            this.x = x;
-            this.y = y;
-            this.boldFont = boldFont;
-        }
-        
-        static CharacterSelector createNew() {
-            return new CharacterSelector();
-        }
-        
-        char getCharacter() {
-            return character;
-        }
-        
-        Color getForegroundColor() {
-            return foregroundColor;
-        }
-        
-        Color getBackgroundColor() {
-            return backgroundColor;
-        }
-        
-        int getX() {
-            return x;
-        }
-        
-        int getY() {
-            return y;
-        }
-        
-        boolean isBoldFont() {
-            return boldFont;
-        }
-        
-        static final class CharacterSelector {
-            ForegroundColorSelector withCharacter(char character) {
-                return new ForegroundColorSelector(character);
-            }
-        }
-        
-        static final class ForegroundColorSelector {
-            private final char character;
-            
-            ForegroundColorSelector(char character) {
-                this.character = character;
-            }
-            
-            BackgroundColorSelector withForegroundColor(Color foregroundColor) {
-                return new BackgroundColorSelector(character, foregroundColor);
-            }
-        }
-        
-        static final class BackgroundColorSelector {
-            private final char character;
-            private final Color foregroundColor;
-            
-            BackgroundColorSelector(char character, Color foregroundColor) {
-                this.character = character;
-                this.foregroundColor = foregroundColor;
-            }
-            
-            XCoordinateSelector withBackgroundColor(Color backgroundColor) {
-                return new XCoordinateSelector(character,
-                                               foregroundColor,
-                                               backgroundColor);
-            }
-        }
-        
-        static final class XCoordinateSelector {
-            private final char character;
-            private final Color foregroundColor;
-            private final Color backgroundColor;
-            
-            XCoordinateSelector(char character,
-                                Color foregroundColor,
-                                Color backgroundColor) {
-                this.character = character;
-                this.foregroundColor = foregroundColor;
-                this.backgroundColor = backgroundColor;
-            }
-            
-            YCoordinateSelector withXCoordinate(int x) {
-                return new YCoordinateSelector(character,
-                                               foregroundColor,
-                                               backgroundColor,
-                                               x);
-            }
-        }
-        
-        static final class YCoordinateSelector {
-            private final char character;
-            private final Color foregroundColor;
-            private final Color backgroundColor;
-            private final int x;
-            
-            YCoordinateSelector(char character,
-                                Color foregroundColor,
-                                Color backgroundColor,
-                                int x) {
-                this.character = character;
-                this.foregroundColor = foregroundColor;
-                this.backgroundColor = backgroundColor;
-                this.x = x;
-            }
-            
-            BoldFontSelector withYCoordinate(int y) {
-                return new BoldFontSelector(character,
-                                            foregroundColor,
-                                            backgroundColor,
-                                            x,
-                                            y);
-            }
-        }
-        
-        static final class BoldFontSelector {
-            private final char character;
-            private final Color foregroundColor;
-            private final Color backgroundColor;
-            private final int x;
-            private final int y;
-            
-            BoldFontSelector(char character, 
-                             Color foregroundColor,
-                             Color backgroundColor,
-                             int x,
-                             int y) {
-                this.character = character;
-                this.foregroundColor = foregroundColor;
-                this.backgroundColor = backgroundColor;
-                this.x = x;
-                this.y = y;
-            }
-            
-            TileRenderingEvent withBoldFontSelector(boolean boldFont) {
-                return new TileRenderingEvent(character,
-                                              foregroundColor,
-                                              backgroundColor, 
-                                              x,
-                                              y,
-                                              boldFont);
-            }
-        }
-    }
     
     /**
      * This inner static class implements a single character tile.
@@ -344,6 +170,13 @@ public final class ColorfulConsole extends JPanel {
          * The boldness of the character of this tile.
          */
         private volatile boolean boldFont;
+        
+        /**
+         * If set to {@code true}, this character tile is blinking, or, in other
+         * words, it paints the background with the foreground color and it
+         * paints the foreground with the background color.
+         */
+        private volatile boolean isBlinking;
     }
     
     private final class CursorBlinkThread extends Thread {
@@ -352,32 +185,16 @@ public final class ColorfulConsole extends JPanel {
         public void run() {
             while (true) {
                 // Invert the foreground and background colors:
-                int x = cursor.x;
-                int y = cursor.y;
+                int x = cursorX.get();
+                int y = cursorY.get();
                 CharacterTile tile = characterTiles[y][x];
-                TileRenderingEvent tileRenderingEvent =
-                        TileRenderingEvent
-                                .createNew()
-                                .withCharacter(tile.character)
-                                .withForegroundColor(tile.backgroundColor)
-                                .withBackgroundColor(tile.foregroundColor)
-                                .withXCoordinate(x)
-                                .withYCoordinate(y)
-                                .withBoldFontSelector(tile.boldFont);
-                renderingEventQueue.add(tileRenderingEvent);
+                tile.isBlinking = true;
+                repaint();
                 sleep(blinkDuration);
                 
                 // Now restore the actual colors:
-                tileRenderingEvent =
-                        TileRenderingEvent
-                                .createNew()
-                                .withCharacter(tile.character)
-                                .withForegroundColor(tile.foregroundColor)
-                                .withBackgroundColor(tile.backgroundColor)
-                                .withXCoordinate(x)
-                                .withYCoordinate(y)
-                                .withBoldFontSelector(tile.boldFont);
-                renderingEventQueue.add(tileRenderingEvent);
+                tile.isBlinking = false;
+                repaint();
                 sleep(blinkDuration);
             } 
         }
@@ -385,9 +202,7 @@ public final class ColorfulConsole extends JPanel {
         private void sleep(int milliseconds) {
             try {
                 Thread.sleep(milliseconds);
-            } catch (InterruptedException ex) {
-                
-            }
+            } catch (InterruptedException ex) {}
         }
     }
     
@@ -434,7 +249,12 @@ public final class ColorfulConsole extends JPanel {
      * @param character the character to print.
      */
     public void print(char character) {
-        print("" + character);
+        int x = cursorX.get();
+        int y = cursorY.get();
+        characterTiles[y][x].character = character;
+        characterTiles[y][x].foregroundColor = getForeground();
+        characterTiles[y][x].backgroundColor = getBackground();
+        characterTiles[y][x].boldFont = boldFontOn;
     }
     
     /**
@@ -491,7 +311,7 @@ public final class ColorfulConsole extends JPanel {
      * @return the current console cursor position.
      */
     public Point getConsoleCursorPosition() {
-        return new Point(cursor);
+        return new Point(cursorX.get(), cursorY.get());
     }
     
     /**
@@ -503,8 +323,8 @@ public final class ColorfulConsole extends JPanel {
     public void setConsoleCursorPosition(int x, int y) {
         checkX(x);
         checkY(y);
-        cursor.x = x;
-        cursor.y = y;
+        cursorX.set(x);
+        cursorY.set(y);
         repaint();
     }
     
@@ -515,33 +335,39 @@ public final class ColorfulConsole extends JPanel {
             updateConsoleSize(g);
         }
         
-        
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-                CharacterTile characterTile = characterTiles[y][x];
-                // Draw character tile background.
-                g.setColor(characterTile.backgroundColor);
-                g.fillRect(x * characterTileWidth, 
-                           y * characterTileHeight,
-                           characterTileWidth, 
-                           characterTileHeight);
-                
-                // Draw the character.
-                Font tileFont = 
-                        new Font(Font.MONOSPACED,
-                                 characterTile.boldFont ? 
-                                         Font.BOLD : 
-                                         Font.PLAIN, 
-                                 font.getSize());
-                g.setColor(characterTile.foregroundColor);
-                characterArray[0] = characterTile.character;
-                g.setFont(tileFont);
-                g.drawChars(characterArray,
-                            0,
-                            1, 
-                            x * characterTileWidth, 
-                            (y + 1) * characterTileHeight - 1);
-            }
+        if (initializeGraphics) {
+            initializeGraphics = false;
+            g.clearRect(0, 
+                        0, 
+                        characterTileWidth * width,
+                        characterTileHeight * height);
+        } else {
+            int x = cursorX.get();
+            int y = cursorY.get();
+            CharacterTile tile = characterTiles[y][x];
+            Font tileFont = new Font(Font.MONOSPACED,
+                                     tile.boldFont ? Font.BOLD : Font.PLAIN,
+                                     font.getSize());
+            
+            // Draw the background:
+            g.setColor(tile.isBlinking ? 
+                       tile.foregroundColor :
+                       tile.backgroundColor);
+            g.fillRect(x * characterTileWidth,
+                       y * characterTileHeight,
+                       characterTileWidth,
+                       characterTileHeight);
+            // Draw the foreground:
+            g.setColor(tile.isBlinking ? 
+                       tile.backgroundColor :
+                       tile.foregroundColor);
+            characterArray[0] = tile.character;
+            g.setFont(tileFont);
+            g.drawChars(characterArray, 
+                        0, 
+                        1, 
+                        x * characterTileWidth,
+                        y * characterTileHeight + 10);
         }
     }
     
@@ -568,10 +394,10 @@ public final class ColorfulConsole extends JPanel {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 CharacterTile characterTile = new CharacterTile();
-                characterTile.boldFont = false;
                 characterTile.foregroundColor = getForeground();
                 characterTile.backgroundColor = getBackground();
                 characterTile.character = ' ';
+                // Font boldness and blinking is set to 'false' by the VM.
                 characterTiles[y][x] = characterTile;
             }
         }
